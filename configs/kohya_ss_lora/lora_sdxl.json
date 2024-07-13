@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "train_type": "lora_sdxl"
+  },
+  "train_config": {
+    "pretrained_model_name_or_path": "",
+    "max_train_steps": "4500",
+    "xformers": true,
+    "sdpa": false,
+    "fp8_base": false,
+    "mixed_precision": "fp16",
+    "cache_latents": true,
+    "cache_latents_to_disk": true,
+    "network_dim": "16",
+    "network_alpha": "8",
+    "network_module": "networks.lora",
+    "network_train_unet_only": true,
+    "learning_rate": "1e-5",
+    "lr_scheduler": "cosine_with_restarts",
+    "optimizer_type": "AdamW",
+    "save_every_n_epochs": "20",
+    "shuffle_caption": false,
+    "lr_warmup_steps": "0",
+    "save_precision": "fp16",
+    "lr_scheduler_num_cycles": "1",
+    "persistent_data_loader_workers": true,
+    "no_metadata": true,
+    "noise_offset": "0.1",
+    "output_dir": "",
+    "output_name": "",
+    "no_half_vae": true,
+    "lowram": false
+  }
+}

@@ -1,0 +1,45 @@
+class FL_SliderLoraDatasetConfig:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "workspace": ("FL_SLIDER_LORA_WORKSPACE",),
+                "target_prompt_1": ("STRING", {"default": ""}),
+                "trigger_prompt_1": ("STRING", {"default": "style"}),
+                "trigger_lora_weight_1": (["positive", "negative"], {"default": "positive"}),
+                "guidance_scale_1": ("FLOAT", {"default": 7.0, "min": 0.1, "max": 30.0, "step": 0.1}),
+            },
+            "optional": {
+                "target_prompt_2": ("STRING", {"default": ""}),
+                "trigger_prompt_2": ("STRING", {"default": "style"}),
+                "trigger_lora_weight_2": (["positive", "negative"], {"default": "negative"}),
+                "guidance_scale_2": ("FLOAT", {"default": 7.0, "min": 0.1, "max": 30.0, "step": 0.1}),
+            }
+        }
+
+    RETURN_TYPES = ("FL_SLIDER_LORA_DATASET",)
+    RETURN_NAMES = ("dataset",)
+
+    FUNCTION = "prepare_dataset"
+    CATEGORY = "FL_Slider_Lora"
+
+    def prepare_dataset(self, workspace, target_prompt_1, trigger_prompt_1, trigger_lora_weight_1, guidance_scale_1,
+                        target_prompt_2="", trigger_prompt_2="", trigger_lora_weight_2="", guidance_scale_2=0.0):
+        dataset = [
+            {
+                "target_prompt": target_prompt_1,
+                "trigger_prompt": trigger_prompt_1,
+                "trigger_lora_weight": 1 if trigger_lora_weight_1 == "positive" else -1,
+                "guidance_scale": guidance_scale_1
+            }
+        ]
+
+        if target_prompt_2 and trigger_prompt_2 and trigger_lora_weight_2 and guidance_scale_2 > 0:
+            dataset.append({
+                "target_prompt": target_prompt_2,
+                "trigger_prompt": trigger_prompt_2,
+                "trigger_lora_weight": 1 if trigger_lora_weight_2 == "positive" else -1,
+                "guidance_scale": guidance_scale_2
+            })
+
+        return (dataset,)

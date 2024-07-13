@@ -1,0 +1,260 @@
+import os
+import torch
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from torch.utils.checkpoint import checkpoint
+from accelerate import Accelerator
+from diffusers.optimization import get_scheduler
+from tqdm.auto import tqdm
+from peft import get_peft_model_state_dict
+import safetensors.torch
+from PIL import Image
+import folder_paths
+from .FL_train_utils import Utils
+
+class GradientEnabledModule(torch.nn.Module):
+    def __init__(self, module):
+        super().__init__()
+        self.module = module
+        self.module.train()  # Ensure the module is in training mode
+
+    def forward(self, *args, **kwargs):
+        with torch.enable_grad():
+            return self.module(*args, **kwargs)
+
+class FL_SliderLoraTrain:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "workspace": ("FL_SLIDER_LORA_WORKSPACE",),
+                "dataset": ("FL_SLIDER_LORA_DATASET",),
+                "advanced_config": ("FL_SLIDER_LORA_ADV_CONFIG",),
+                "save_every_n_steps": ("INT", {"default": 500, "min": 100, "max": 10000, "step": 100}),
+                "num_checkpoint_limit": ("INT", {"default": 5, "min": 1, "max": 20}),
+                "generate_every_n_steps": ("INT", {"default": 1000, "min": 100, "max": 10000, "step": 100}),
+            },
+        }
+
+    RETURN_TYPES = ()
+    FUNCTION = "train"
+    CATEGORY = "FL_Slider_Lora"
+    OUTPUT_NODE = True
+
+    def train(self, workspace, dataset, advanced_config, save_every_n_steps, num_checkpoint_limit,
+              generate_every_n_steps):
+        # Set up accelerator
+        accelerator = Accelerator(
+            gradient_accumulation_steps=advanced_config["gradient_accumulation_steps"],
+            mixed_precision="fp16" if workspace["device"] == "cuda" else "no"
+        )
+
+        # Prepare model components
+        unet = workspace["pipeline"].unet
+        text_encoder = workspace["pipeline"].text_encoder
+        vae = workspace["pipeline"].vae
+        tokenizer = workspace["pipeline"].tokenizer
+        scheduler = workspace["pipeline"].scheduler
+
+        # Explicitly set models to train/eval mode
+        unet.train()
+        vae.eval()
+        text_encoder.train()  # Set text_encoder to train mode regardless of advanced_config
+
+        # Prepare optimizer
+        params_to_optimize = list(unet.parameters()) + list(text_encoder.parameters())
+        optimizer = torch.optim.AdamW(
+            params_to_optimize,
+            lr=advanced_config["learning_rate"],
+            betas=(advanced_config["adam_beta1"], advanced_config["adam_beta2"]),
+            weight_decay=advanced_config["adam_weight_decay"],
+            eps=advanced_config["adam_epsilon"],
+        )
+
+        # Prepare learning rate scheduler
+        lr_scheduler = get_scheduler(
+            advanced_config["lr_scheduler"],
+            optimizer=optimizer,
+            num_warmup_steps=advanced_config["lr_warmup_steps"] * advanced_config["gradient_accumulation_steps"],
+            num_training_steps=advanced_config["max_train_steps"] * advanced_config["gradient_accumulation_steps"],
+        )
+
+        # Prepare for distributed training
+        unet, text_encoder, optimizer, lr_scheduler = accelerator.prepare(unet, text_encoder, optimizer, lr_scheduler)
+
+        # Training loop
+        global_step = 0
+        progress_bar = tqdm(total=advanced_config["max_train_steps"], disable=not accelerator.is_local_main_process)
+        progress_bar.set_description("Training Steps")
+
+        # Wrap the text encoder in our custom module
+        text_encoder = GradientEnabledModule(workspace["pipeline"].text_encoder)
+
+        # Prepare for distributed training
+        unet, text_encoder, optimizer, lr_scheduler = accelerator.prepare(unet, text_encoder, optimizer, lr_scheduler)
+
+        for epoch in range(advanced_config["num_train_epochs"]):
+            for step, batch in enumerate(dataset):
+                with torch.inference_mode(False):
+                    with accelerator.accumulate(unet):
+                        # Encode text
+                        target_input_ids = tokenizer(batch["target_prompt"], return_tensors="pt").input_ids.to(
+                            workspace["device"])
+                        trigger_input_ids = tokenizer(batch["trigger_prompt"], return_tensors="pt").input_ids.to(
+                            workspace["device"])
+
+                        # Ensure input_ids are long tensors
+                        target_input_ids = target_input_ids.long()
+                        trigger_input_ids = trigger_input_ids.long()
+
+                        print(f"Target input_ids dtype: {target_input_ids.dtype}")
+                        print(f"Trigger input_ids dtype: {trigger_input_ids.dtype}")
+
+                        # Forward pass through text encoder
+                        with torch.enable_grad():
+                            target_encoder_hidden_states = text_encoder(target_input_ids)[0]
+                            trigger_encoder_hidden_states = text_encoder(trigger_input_ids)[0]
+
+                        print(f"Target hidden states dtype: {target_encoder_hidden_states.dtype}")
+                        print(f"Trigger hidden states dtype: {trigger_encoder_hidden_states.dtype}")
+
+                        # Ensure hidden states have gradients enabled and are float tensors
+                        target_encoder_hidden_states = target_encoder_hidden_states.float().requires_grad_()
+                        trigger_encoder_hidden_states = trigger_encoder_hidden_states.float().requires_grad_()
+
+                        # Generate initial noise
+                        latents = torch.randn(
+                            (1, unet.config.in_channels, workspace["resolution"] // 8, workspace["resolution"] // 8),
+                            device=workspace["device"],
+                            dtype=torch.float32
+                        ).requires_grad_()
+
+                        # Set up timesteps
+                        scheduler.set_timesteps(1000)
+                        timesteps = scheduler.timesteps
+
+                        # Noise schedule loop
+                        for i, t in enumerate(timesteps):
+                            # Prepare latent input
+                            latent_model_input = torch.cat([latents] * 2)
+                            latent_model_input = scheduler.scale_model_input(latent_model_input, t)
+
+                            # Prepare timestep
+                            timestep = torch.tensor([t], dtype=torch.long, device=workspace["device"])
+
+                            # Prepare encoder hidden states
+                            encoder_hidden_states = torch.cat(
+                                [trigger_encoder_hidden_states, target_encoder_hidden_states])
+
+                            # Get noise prediction
+                            noise_pred = unet(
+                                latent_model_input,
+                                timestep,
+                                encoder_hidden_states=encoder_hidden_states
+                            ).sample
+
+                            # Perform guidance
+                            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+                            noise_pred = noise_pred_uncond + batch["guidance_scale"] * (
+                                        noise_pred_text - noise_pred_uncond)
+
+                            # Update latents
+                            latents = scheduler.step(noise_pred, t, latents).prev_sample
+
+                        # Decode latents to image space
+                        images = vae.decode(latents / 0.18215).sample
+
+                        # Compute loss
+                        target_latents = vae.encode(images).latent_dist.sample() * 0.18215
+                        loss = F.mse_loss(latents.float(), target_latents.float(), reduction="mean")
+
+                        # Backpropagate
+                        accelerator.backward(loss)
+                        if accelerator.sync_gradients:
+                            accelerator.clip_grad_norm_(params_to_optimize, advanced_config["max_grad_norm"])
+                        optimizer.step()
+                        lr_scheduler.step()
+                        optimizer.zero_grad()
+
+                # Check for saving and sampling
+                if accelerator.sync_gradients:
+                    global_step += 1
+                    if global_step % save_every_n_steps == 0:
+                        self.save_checkpoint(accelerator, unet, text_encoder, workspace, global_step,
+                                             num_checkpoint_limit)
+
+                    if global_step % generate_every_n_steps == 0:
+                        self.generate_sample(workspace, batch["target_prompt"], batch["trigger_prompt"], global_step)
+
+                    progress_bar.update(1)
+                    progress_bar.set_postfix(loss=loss.detach().item())
+
+                if global_step >= advanced_config["max_train_steps"]:
+                    break
+
+            if global_step >= advanced_config["max_train_steps"]:
+                break
+
+        # Final saves and generations
+        self.save_checkpoint(accelerator, unet, text_encoder, workspace, global_step, num_checkpoint_limit,
+                             is_final=True)
+        self.generate_sample(workspace, dataset[0]["target_prompt"], dataset[0]["trigger_prompt"], global_step,
+                             is_final=True)
+
+        accelerator.wait_for_everyone()
+
+        return ()
+
+    @staticmethod
+    def save_checkpoint(accelerator, unet, text_encoder, workspace, global_step, num_checkpoint_limit, is_final=False):
+        accelerator.wait_for_everyone()
+        if accelerator.is_main_process:
+            unet = accelerator.unwrap_model(unet)
+            lora_state_dict = get_peft_model_state_dict(unet)
+
+            if text_encoder is not None:
+                text_encoder = accelerator.unwrap_model(text_encoder)
+                text_encoder_state_dict = get_peft_model_state_dict(text_encoder)
+                lora_state_dict.update(text_encoder_state_dict)
+
+            os.makedirs(workspace["workspace_dir"], exist_ok=True)
+            checkpoint_dir = os.path.join(workspace["workspace_dir"], "checkpoints")
+            os.makedirs(checkpoint_dir, exist_ok=True)
+
+            if is_final:
+                save_path = os.path.join(workspace["workspace_dir"], "slider_lora_final.safetensors")
+            else:
+                save_path = os.path.join(checkpoint_dir, f"slider_lora_step_{global_step:06d}.safetensors")
+
+            safetensors.torch.save_file(lora_state_dict, save_path)
+
+            # Manage number of checkpoints
+            checkpoints = sorted([f for f in os.listdir(checkpoint_dir) if f.endswith('.safetensors')])
+            while len(checkpoints) > num_checkpoint_limit:
+                os.remove(os.path.join(checkpoint_dir, checkpoints.pop(0)))
+
+        accelerator.wait_for_everyone()
+
+    @staticmethod
+    def generate_sample(workspace, target_prompt, trigger_prompt, global_step, is_final=False):
+        pipeline = workspace["pipeline"]
+        pipeline.to(workspace["device"])
+
+        with torch.no_grad():
+            image = pipeline(
+                prompt=target_prompt,
+                negative_prompt=trigger_prompt,
+                num_inference_steps=30,
+                guidance_scale=7.5,
+            ).images[0]
+
+        # Save the image
+        os.makedirs(os.path.join(workspace["workspace_dir"], "samples"), exist_ok=True)
+        if is_final:
+            image_path = os.path.join(workspace["workspace_dir"], "samples", f"final_sample.png")
+        else:
+            image_path = os.path.join(workspace["workspace_dir"], "samples", f"sample_step_{global_step:06d}.png")
+        image.save(image_path)
+
+        pipeline.to("cpu")
+        torch.cuda.empty_cache()

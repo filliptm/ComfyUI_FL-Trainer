@@ -1,0 +1,127 @@
+import torch
+import torch.nn.functional as F
+from typing import List, Union, Optional, Tuple
+from diffusers import DDPMScheduler, UNet2DConditionModel
+from transformers import CLIPTextModel, CLIPTokenizer
+
+
+class SliderLoraPipelineBase:
+    def __init__(
+            self,
+            unet: UNet2DConditionModel,
+            text_encoder: Union[CLIPTextModel, List[CLIPTextModel]],
+            tokenizer: Union[CLIPTokenizer, List[CLIPTokenizer]],
+            scheduler: DDPMScheduler,
+            vae=None,
+    ):
+        self.unet = unet
+        self.text_encoder = text_encoder
+        self.tokenizer = tokenizer
+        self.scheduler = scheduler
+        self.vae = vae
+
+    def encode_prompt(self, prompt: str) -> torch.Tensor:
+        raise NotImplementedError("Subclasses must implement this method")
+
+    def pre_denoise(
+            self,
+            latents: torch.Tensor,
+            prompt_embeds: torch.Tensor,
+            timesteps: int,
+            guidance_scale: float,
+    ) -> torch.Tensor:
+        for i, t in enumerate(self.scheduler.timesteps[:timesteps]):
+            latent_model_input = torch.cat([latents] * 2)
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, timestep=t)
+
+            # Predict the noise residual
+            with torch.no_grad():
+                noise_pred = self.unet(
+                    latent_model_input,
+                    t,
+                    encoder_hidden_states=prompt_embeds
+                ).sample
+
+            # Perform guidance
+            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+
+            # Compute the previous noisy sample x_t -> x_t-1
+            latents = self.scheduler.step(noise_pred, t, latents).prev_sample
+
+        return latents
+
+    def predict_noise(
+            self,
+            latents: torch.Tensor,
+            prompt_embeds: torch.Tensor,
+            timestep: int,
+            guidance_scales: List[float],
+    ) -> torch.Tensor:
+        latent_model_input = torch.cat([latents] * len(guidance_scales))
+
+        # Predict the noise residual
+        noise_pred = self.unet(
+            latent_model_input,
+            timestep,
+            encoder_hidden_states=prompt_embeds
+        ).sample
+
+        # Perform guidance
+        noise_pred_chunks = noise_pred.chunk(len(guidance_scales))
+        noise_pred = torch.stack([n * g for n, g in zip(noise_pred_chunks, guidance_scales)]).sum(dim=0)
+
+        return noise_pred
+
+
+def combine_tensors(tensors: List[torch.Tensor], repeats: int) -> torch.Tensor:
+    return torch.cat(tensors).repeat_interleave(repeats, dim=0)
+
+
+def get_timesteps(scheduler: DDPMScheduler, num_inference_steps: int, strength: float, device):
+    # Get the original timestep using init_timestep
+    init_timestep = min(int(num_inference_steps * strength), num_inference_steps)
+
+    t_start = max(num_inference_steps - init_timestep, 0)
+    timesteps = scheduler.timesteps[t_start:]
+
+    return timesteps, num_inference_steps - t_start
+
+
+class SliderLoraSD15Pipeline(SliderLoraPipelineBase):
+    def encode_prompt(self, prompt: str) -> torch.Tensor:
+        text_input = self.tokenizer(
+            prompt,
+            padding="max_length",
+            max_length=self.tokenizer.model_max_length,
+            truncation=True,
+            return_tensors="pt",
+        )
+        return self.text_encoder(text_input.input_ids.to(self.text_encoder.device))[0]
+
+
+class SliderLoraSDXLPipeline(SliderLoraPipelineBase):
+    def encode_prompt(self, prompt: str) -> Tuple[torch.Tensor, torch.Tensor]:
+        prompt_embeds_list = []
+        pooled_prompt_embeds = None
+
+        for i, text_encoder in enumerate(self.text_encoder):
+            text_input = self.tokenizer[i](
+                prompt,
+                padding="max_length",
+                max_length=self.tokenizer[i].model_max_length,
+                truncation=True,
+                return_tensors="pt",
+            )
+            prompt_embeds = text_encoder(
+                text_input.input_ids.to(text_encoder.device),
+                output_hidden_states=True,
+            )
+            pooled_prompt_embeds = prompt_embeds[0]
+            prompt_embeds = prompt_embeds.hidden_states[-2]
+            prompt_embeds_list.append(prompt_embeds)
+
+        prompt_embeds = torch.cat(prompt_embeds_list, dim=-1)
+        return prompt_embeds, pooled_prompt_embeds
+
+# Additional utility functions can be added here as needed
