@@ -18,13 +18,14 @@ class FL_KohyaSSDatasetConfig:
                 "batch_size": ("INT", {"default": 1, "min":1}),
                 "force_clear": (["enable", "disable"], {"default": "disable"}),
                 "force_clear_only_images": (["enable", "disable"], {"default": "disable"}),
-                "image_format": (["png", "jpg", "webp"], {"default": "webp"}),
-                "dataset_config_extension": ([".toml", ".json"], {"default": ".json"}),
             },
             "optional": {
                 "conditioning_images": ("IMAGE",),
             }
         }
+
+    dataset_config_extension = ".json"
+    image_format = "jpg"
 
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("workspace_images_dir",)

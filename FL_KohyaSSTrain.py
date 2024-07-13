@@ -69,17 +69,18 @@ class FL_KohyaSSTrain:
                 "ckpt_name": (folder_paths.get_filename_list("checkpoints"), ),
                 "max_train_steps": ("INT", {"default": 0, "min": 0, "max": 0x7fffffff}),
                 "max_train_epochs": ("INT", {"default": 100, "min": 0, "max": 0x7fffffff}),
-                "save_every_n_epochs": ("INT", {"default": 10}),
-                "learning_rate": ("STRING", {"default": "1e-5"}),
+                "save_every_n_epochs": ("INT", {"default": 1}),
+                "learning_rate": ("STRING", {"default": "0.0001"}),
                 "base_lora": (loras, {"default": "latest"}),
-                "sample_generate": (["enable", "disable"], {"default": "enable"}),
                 "sample_prompt": ("STRING", {"default": "", "dynamicPrompts": False, "multiline": False}),
+                "advanced_config": ("FL_TT_SS_AdvConfig",),
             },
             "optional": {
-                "advanced_config": ("FL_TT_SS_AdvConfig",),
                 "caption_completed_flag": (AlwaysEqualProxy("*"),),
             },
         }
+
+    sample_generate = "enable"
 
     RETURN_TYPES = ()
     RETURN_NAMES = ()
