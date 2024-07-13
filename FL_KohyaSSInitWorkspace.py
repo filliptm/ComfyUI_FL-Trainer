@@ -9,13 +9,16 @@ class FL_KohyaSSInitWorkspace:
         return {
             "required": {
                 "lora_name": ("STRING", {"default": ""}),
+                "branch": ("STRING", {"default": "71e2c91330a9d866ec05cdd10584bbb962896a99"}),
+                "source": ([
+                    "github",
+                    "githubfast",
+                    "521github",
+                    "kkgithub",
+                ], {"default": "github"}),
                 "seed": ("INT", {"default": 0}),
             },
         }
-
-    branch = "71e2c91330a9d866ec05cdd10584bbb962896a99"
-    source = "github"
-
 
     RETURN_TYPES = ("FL_TT_SS_WorkspaceConfig",)
     RETURN_NAMES = ("workspace_config",)

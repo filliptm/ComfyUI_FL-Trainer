@@ -8,7 +8,7 @@ class FL_LoadImagesFromDirectoryPath:
         return {
             "required": {
                 "directory": ("STRING", {"default": "X://path/to/images"}),
-                "caption_extension": ([".caption", ".txt"], {"default": ".caption"}),
+                "caption_extension": ([".caption", ".txt"], {"default": ".txt"}),
             },
         }
 
