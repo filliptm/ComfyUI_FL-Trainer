@@ -1,0 +1,359 @@
+{
+  "last_node_id": 14,
+  "last_link_id": 16,
+  "nodes": [
+    {
+      "id": 11,
+      "type": "FL_KohyaSSAdvConfig",
+      "pos": [
+        645,
+        766
+      ],
+      "size": {
+        "0": 315,
+        "1": 634
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "advanced_config",
+          "type": "FL_TT_SS_AdvConfig",
+          "links": [
+            15
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FL_KohyaSSAdvConfig"
+      },
+      "widgets_values": [
+        "enable",
+        "disable",
+        "disable",
+        "fp16",
+        1,
+        "disable",
+        "enable",
+        "enable",
+        16,
+        8,
+        "networks.lora",
+        "enable",
+        "cosine",
+        1,
+        "AdamW",
+        0,
+        "",
+        "",
+        "disable",
+        "fp16",
+        "enable",
+        "enable",
+        0.1,
+        "enable",
+        "disable"
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 12,
+      "type": "FL_KohyaSSInitWorkspace",
+      "pos": [
+        655,
+        406
+      ],
+      "size": {
+        "0": 315,
+        "1": 154
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "workspace_config",
+          "type": "FL_TT_SS_WorkspaceConfig",
+          "links": [
+            12,
+            16
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FL_KohyaSSInitWorkspace"
+      },
+      "widgets_values": [
+        "",
+        "71e2c91330a9d866ec05cdd10584bbb962896a99",
+        "github",
+        0,
+        "randomize"
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 2,
+      "type": "FL_KohyaSSDatasetConfig",
+      "pos": [
+        1073,
+        460
+      ],
+      "size": [
+        384.95929580456436,
+        310
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "workspace_config",
+          "type": "FL_TT_SS_WorkspaceConfig",
+          "link": 12,
+          "slot_index": 0
+        },
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "name": "conditioning_images",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "captions",
+          "type": "STRING",
+          "link": 3,
+          "widget": {
+            "name": "captions"
+          },
+          "slot_index": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "workspace_images_dir",
+          "type": "STRING",
+          "links": [
+            14
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FL_KohyaSSDatasetConfig"
+      },
+      "widgets_values": [
+        "",
+        "enable",
+        1024,
+        15,
+        ".txt",
+        1,
+        "disable",
+        "disable",
+        "jpg",
+        ".json"
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 10,
+      "type": "FL_Kohya_EasyTrain",
+      "pos": [
+        1529,
+        723
+      ],
+      "size": [
+        383.6555363227342,
+        361.72726155954797
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "properties": {
+        "Node name for S&R": "FL_Kohya_EasyTrain"
+      },
+      "widgets_values": [
+        "my_lora",
+        512,
+        "lora_sd1_5",
+        30,
+        "",
+        "MODELS\\1.5 Anime\\manmaruMix_v20.safetensors",
+        "",
+        "enable",
+        "disable",
+        0.0001,
+        10
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 13,
+      "type": "FL_KohyaSSTrain",
+      "pos": [
+        1017,
+        850
+      ],
+      "size": [
+        437.4739335083009,
+        374.80338698218975
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "workspace_config",
+          "type": "FL_TT_SS_WorkspaceConfig",
+          "link": 16,
+          "slot_index": 0
+        },
+        {
+          "name": "advanced_config",
+          "type": "FL_TT_SS_AdvConfig",
+          "link": 15,
+          "slot_index": 1
+        },
+        {
+          "name": "caption_completed_flag",
+          "type": "*",
+          "link": 14
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FL_KohyaSSTrain"
+      },
+      "widgets_values": [
+        "lora_sdxl",
+        "MODELS\\1.5 Anime\\ghibliStyleMix_v10.ckpt",
+        0,
+        100,
+        1,
+        "0.0001",
+        "latest",
+        ""
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    },
+    {
+      "id": 3,
+      "type": "FL_LoadImagesFromDirectoryPath",
+      "pos": [
+        651,
+        614
+      ],
+      "size": {
+        "0": 315,
+        "1": 102
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            2
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "captions",
+          "type": "STRING",
+          "links": [
+            3
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FL_LoadImagesFromDirectoryPath"
+      },
+      "widgets_values": [
+        "",
+        ".txt"
+      ],
+      "color": "#16727c",
+      "bgcolor": "#4F0074"
+    }
+  ],
+  "links": [
+    [
+      2,
+      3,
+      0,
+      2,
+      1,
+      "IMAGE"
+    ],
+    [
+      3,
+      3,
+      1,
+      2,
+      3,
+      "STRING"
+    ],
+    [
+      12,
+      12,
+      0,
+      2,
+      0,
+      "FL_TT_SS_WorkspaceConfig"
+    ],
+    [
+      14,
+      2,
+      0,
+      13,
+      2,
+      "*"
+    ],
+    [
+      15,
+      11,
+      0,
+      13,
+      1,
+      "FL_TT_SS_AdvConfig"
+    ],
+    [
+      16,
+      12,
+      0,
+      13,
+      0,
+      "FL_TT_SS_WorkspaceConfig"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.7972024500000015,
+      "offset": [
+        -551.9651418366284,
+        -153.1479193825923
+      ]
+    }
+  },
+  "version": 0.4
+}
