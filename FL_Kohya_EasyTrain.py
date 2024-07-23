@@ -137,7 +137,7 @@ class FL_Kohya_EasyTrain:
         return Utils.list_tensor2tensor(images), captions
 
     def clone_or_update_repo(self):
-        FL_dir = Utils.get_minus_zone_models_path()
+        FL_dir = Utils.get_FL_models_path()
         kohya_ss_lora_dir = os.path.join(FL_dir, "train_tools", "kohya_ss_lora")
         repo_url = "https://github.com/kohya-ss/sd-scripts"
         branch = "main"  # You can change this to a specific branch if needed

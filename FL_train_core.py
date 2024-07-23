@@ -24,7 +24,7 @@ git_accelerate_urls = {
 
 
 def FL_KohyaSSCloneRepo_call(args={}):
-    FL_dir = Utils.get_minus_zone_models_path()
+    FL_dir = Utils.get_FL_models_path()
 
     branch_repoid = args.get("branch_repoid", "kohya-ss/sd-scripts")
     branch_local_name = args.get("branch_local_name", "kohya_ss_lora")
@@ -589,7 +589,7 @@ def FL_KohyaSSTrain_call(args={}):
     branch_local_name = workspace_config.get(
         "branch_local_name", "kohya_ss_lora")
     kohya_ss_tool_dir = os.path.join(
-        Utils.get_minus_zone_models_path(), "train_tools", branch_local_name)
+        Utils.get_FL_models_path(), "train_tools", branch_local_name)
 
     if kohya_ss_tool_dir not in sys.path:
         sys.path.append(kohya_ss_tool_dir)
@@ -739,7 +739,7 @@ def FL_KohyaSS_KohakuBlueleaf_HYHiDSimpleT2I_call(args={}):
 
     branch_local_name = args.get("branch_local_name")
     kohya_ss_tool_dir = os.path.join(
-        Utils.get_minus_zone_models_path(), "train_tools", branch_local_name)
+        Utils.get_FL_models_path(), "train_tools", branch_local_name)
     if kohya_ss_tool_dir not in sys.path:
         sys.path.append(kohya_ss_tool_dir)
     from library.hunyuan_models import DiT_g_2, MT5Embedder

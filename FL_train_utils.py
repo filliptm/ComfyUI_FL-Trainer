@@ -194,9 +194,9 @@ class Utils:
         Utils.cache_set(key, {"model_path": model_path, "model": model})
         return True
 
-    def get_minus_zone_models_path():
+    def get_FL_models_path():
         models_path = os.path.join(
-            folder_paths.models_dir, "minus_zone_models")
+            folder_paths.models_dir, "FL_Kohya")
         os.makedirs(models_path, exist_ok=True)
         return models_path
 
