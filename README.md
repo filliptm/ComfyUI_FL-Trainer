@@ -16,7 +16,7 @@ recommended settings in the screenshot! Load in your images and captions and let
 
 # Some things to know.
 
-Iv tested the nodes on a cloud instance and it doesn't work as fully intended. When you connect everything and hit Queue for the first time it will create a folder in the comfy outputs folder named "FL_train_workspaces". In this folder, you will see a few things.
+Iv tested the nodes on a cloud instance and it doesn't work as fully intended. When you connect everything and hit Queue for the first time it will create a folder in the comfy/models/Loras folder named "FL_train_workspaces". In this folder, you will see a few things.
 - Folder Named after your Lora input
 - Output folder with your epochs
 - Sample_image folder where your samples are stored
