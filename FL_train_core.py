@@ -80,8 +80,7 @@ def FL_KohyaSSInitWorkspace_call(args={}):
         raise Exception("lora(lora_name is required)")
 
     args["workspace_name"] = workspace_name
-    workspaces_dir = os.path.join(
-        folder_paths.output_directory, "FL_train_workspaces")
+    workspaces_dir = os.path.join(folder_paths.models_dir, "loras", "FL_train_workspaces")
 
     os.makedirs(workspaces_dir, exist_ok=True)
 
