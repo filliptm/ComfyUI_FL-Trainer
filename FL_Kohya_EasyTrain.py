@@ -3,6 +3,8 @@ from . import FL_train_core
 import os
 import folder_paths
 from .FL_train_utils import Utils
+import subprocess
+import sys
 
 class FL_Kohya_EasyTrain:
     train_config_template_dir = os.path.join(
@@ -43,7 +45,10 @@ class FL_Kohya_EasyTrain:
         if not lora_name.strip():
             raise ValueError("LoRA name is required. Please provide a name for your LoRA.")
 
-        # Initialize workspace (bypassing FL_KohyaSSInitWorkspace_call)
+        # Clone or update the repository
+        self.clone_or_update_repo()
+
+        # Initialize workspace
         workspaces_dir = os.path.join(folder_paths.output_directory, "FL_train_workspaces")
         os.makedirs(workspaces_dir, exist_ok=True)
         workspace_dir = os.path.join(workspaces_dir, lora_name)
@@ -130,3 +135,37 @@ class FL_Kohya_EasyTrain:
                         captions.append(f.read().strip())
                     images.append(Utils.pil2tensor(Utils.loadImage(image_path)))
         return Utils.list_tensor2tensor(images), captions
+
+    def clone_or_update_repo(self):
+        FL_dir = Utils.get_minus_zone_models_path()
+        kohya_ss_lora_dir = os.path.join(FL_dir, "train_tools", "kohya_ss_lora")
+        repo_url = "https://github.com/kohya-ss/sd-scripts"
+        branch = "main"  # You can change this to a specific branch if needed
+
+        if not os.path.exists(kohya_ss_lora_dir):
+            # Clone the repository if it doesn't exist
+            subprocess.run(
+                ["git", "clone", "--depth", "1", repo_url, kohya_ss_lora_dir],
+                check=True
+            )
+        else:
+            # Update the existing repository
+            subprocess.run(
+                ["git", "fetch", "--depth", "1", "origin", branch],
+                cwd=kohya_ss_lora_dir,
+                check=True
+            )
+            subprocess.run(
+                ["git", "checkout", branch],
+                cwd=kohya_ss_lora_dir,
+                check=True
+            )
+            subprocess.run(
+                ["git", "pull", "origin", branch],
+                cwd=kohya_ss_lora_dir,
+                check=True
+            )
+
+        # Ensure the repo directory is in sys.path
+        if kohya_ss_lora_dir not in sys.path:
+            sys.path.append(kohya_ss_lora_dir)
