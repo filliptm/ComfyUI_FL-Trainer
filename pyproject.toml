@@ -1,0 +1,15 @@
+[project]
+name = "comfyui_fl-trainer"
+description = "Train Image Loras on both sd1.5 and SDXL. This repo git clones the pieces needed to train. It pops open a second terminal window do do the training. It will also display the inference samples in the node itself so you can track the results."
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["opencv-python"]
+
+[project.urls]
+Repository = "https://github.com/filliptm/ComfyUI_FL-Trainer"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI_FL-Trainer"
+Icon = ""
