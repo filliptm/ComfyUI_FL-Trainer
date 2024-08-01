@@ -1,5 +1,3 @@
-
-
 import argparse
 import hashlib
 import os
@@ -15,23 +13,28 @@ from .FL_train_utils import Utils
 import folder_paths
 import nodes
 
-
 git_accelerate_urls = {
     "githubfast": "githubfast.com",
     "521github": "521github.com",
     "kkgithub": "kkgithub.com",
 }
 
+# Get the current directory (where FL_train_core.py is located)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+kohya_ss_dir = os.path.join(current_dir, "kohya_ss_lora")
+if kohya_ss_dir not in sys.path:
+    sys.path.append(kohya_ss_dir)
 
 def FL_KohyaSSCloneRepo_call(args={}):
-    FL_dir = Utils.get_FL_models_path()
-
     branch_repoid = args.get("branch_repoid", "kohya-ss/sd-scripts")
     branch_local_name = args.get("branch_local_name", "kohya_ss_lora")
 
     git_url = f"https://github.com/{branch_repoid}"
     source = args.get("source", "github")
-    kohya_ss_lora_dir = os.path.join(FL_dir, "train_tools", branch_local_name)
+
+    # Use the current directory to clone the repo
+    kohya_ss_lora_dir = os.path.join(current_dir, branch_local_name)
+
     if git_accelerate_urls.get(source, None) is not None:
         git_url = f"https://{git_accelerate_urls[source]}/{branch_repoid}"
     try:
@@ -39,7 +42,6 @@ def FL_KohyaSSCloneRepo_call(args={}):
             subprocess.run(
                 ["git", "clone", "--depth", "1", git_url, kohya_ss_lora_dir], check=True)
 
-        # git remote set-branches origin 'main'
         branch = args.get("branch", "main")
 
         short_result = subprocess.run(
@@ -66,7 +68,9 @@ def FL_KohyaSSCloneRepo_call(args={}):
                 ["git", "checkout", branch], cwd=kohya_ss_lora_dir, check=True)
 
     except Exception as e:
-        raise Exception(f"kohya-ss/sd-scripts...")
+        raise Exception(f"Failed to clone or update kohya-ss/sd-scripts: {str(e)}")
+
+    return kohya_ss_lora_dir
 
 
 
@@ -501,9 +505,14 @@ def generate_kohya_ss_config(args):
 
     train_config_template = args.get("train_config_template", None)
     train_config_template_dir = os.path.join(
-        os.path.dirname(__file__), "configs", "kohya_ss_lora")
+        os.path.dirname(__file__), "configs", "kohya_ss_lora"
+    )
     train_config_template_file = os.path.join(
-        train_config_template_dir, train_config_template + ".json")
+        train_config_template_dir, train_config_template + ".json"
+    )
+
+    if not os.path.exists(train_config_template_file):
+        raise Exception(f"Config template not found: {train_config_template_file}")
 
     # raise Exception(f"args: {json.dumps(args, indent=4, ensure_ascii=False)}")
     config = None
@@ -587,8 +596,7 @@ def FL_KohyaSSTrain_call(args={}):
 
     branch_local_name = workspace_config.get(
         "branch_local_name", "kohya_ss_lora")
-    kohya_ss_tool_dir = os.path.join(
-        Utils.get_FL_models_path(), "train_tools", branch_local_name)
+    kohya_ss_tool_dir = os.path.join(current_dir, branch_local_name)
 
     if kohya_ss_tool_dir not in sys.path:
         sys.path.append(kohya_ss_tool_dir)

@@ -3,7 +3,9 @@ import importlib
 import folder_paths
 from .FL_train_utils import AlwaysEqualProxy, Utils
 
+
 class FL_KohyaSSTrain:
+
     train_config_template_dir = os.path.join(
         os.path.dirname(__file__), "configs", "kohya_ss_lora"
     )

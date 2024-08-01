@@ -13,6 +13,12 @@ import argparse
 import toml
 
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+kohya_ss_dir = os.path.join(current_dir, "kohya_ss_lora")
+if kohya_ss_dir not in sys.path:
+    sys.path.append(kohya_ss_dir)
+
+
 def config2args(train_parser: argparse.ArgumentParser, config):
 
     config_args_list = []
@@ -399,8 +405,9 @@ if __name__ == "__main__":
         print(f"master_port = {master_port}")
 
         sys_path = args.sys_path
-        if sys_path != "":
-            sys.path.append(sys_path)
+        if sys_path == "":
+            sys_path = kohya_ss_dir
+        sys.path.append(sys_path)
 
         config_file = args.config
         if config_file == "":

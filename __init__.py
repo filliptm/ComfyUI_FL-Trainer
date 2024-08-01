@@ -1,10 +1,11 @@
 # __init__.py
 
+
 from .FL_KohyaSSInitWorkspace import FL_KohyaSSInitWorkspace
 from .FL_KohyaSSDatasetConfig import FL_KohyaSSDatasetConfig
 from .FL_KohyaSSAdvConfig import FL_KohyaSSAdvConfig
 from .FL_KohyaSSTrain import FL_KohyaSSTrain
-from .FL_LoadImagesFromDirectoryPath import FL_LoadImagesFromDirectoryPath
+from .nodes.FL_LoadImagesFromDirectoryPath import FL_LoadImagesFromDirectoryPath
 from .FL_Kohya_EasyTrain import FL_Kohya_EasyTrain
 #==============================================================================
 #==============================================================================
