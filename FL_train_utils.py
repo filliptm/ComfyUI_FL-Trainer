@@ -990,54 +990,17 @@ class HSubprocess:
 
         self.screen_name = screen_name
         if screen_name is not None:
-            if not self._is_screen_installed():
-                self._install_screen()
+            try:
+                subprocess.check_call(["screen", "-v"])
+            except Exception as e:
+                raise Exception("Please install screen first.")
 
-            screen_cmd = ["screen", "-R", screen_name, "-m"]
+            screen_cmd = ["screen", "-R", screen_name, "-m", ]
             screen_cmd.extend(args)
+
             self.args = screen_cmd
         else:
             self.args = args
-
-    def _is_screen_installed(self):
-        try:
-            subprocess.check_call(["screen", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return False
-
-    def _install_screen(self):
-        print("Screen is not installed. Attempting to install...")
-        try:
-            if platform.system() == "Linux":
-                if self._is_command_available("apt-get"):
-                    subprocess.check_call(["apt-get", "update"])
-                    subprocess.check_call(["apt-get", "install", "-y", "screen"])
-                elif self._is_command_available("yum"):
-                    subprocess.check_call(["yum", "install", "-y", "screen"])
-                elif self._is_command_available("dnf"):
-                    subprocess.check_call(["dnf", "install", "-y", "screen"])
-                elif self._is_command_available("zypper"):
-                    subprocess.check_call(["zypper", "install", "-y", "screen"])
-                elif self._is_command_available("pacman"):
-                    subprocess.check_call(["pacman", "-S", "--noconfirm", "screen"])
-                else:
-                    raise Exception("No supported package manager found for automatic screen installation.")
-            elif platform.system() == "Darwin":  # macOS
-                if self._is_command_available("brew"):
-                    subprocess.check_call(["brew", "install", "screen"])
-                else:
-                    raise Exception(
-                        "Homebrew is not installed. Please install Homebrew to proceed with screen installation.")
-            else:
-                raise Exception("Automatic screen installation is not supported on this operating system.")
-
-            print("Screen has been successfully installed.")
-        except Exception as e:
-            raise Exception(f"Failed to install screen: {str(e)}")
-
-    def _is_command_available(self, cmd):
-        return subprocess.call(["which", cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
 
     def stop(self):
         if self._mswindows:
