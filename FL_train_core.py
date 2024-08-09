@@ -72,8 +72,6 @@ def FL_KohyaSSCloneRepo_call(args={}):
 
     return kohya_ss_lora_dir
 
-
-
 def FL_KohyaSSInitWorkspace_call(args={}):
     FL_KohyaSSCloneRepo_call(args)
 
@@ -612,7 +610,6 @@ def FL_KohyaSSTrain_call(args={}):
                 filter(lambda x: x.endswith(".safetensors"), workspace_lora_files))
             workspace_lora_files = list(
                 map(lambda x: os.path.join(workspace_lora_dir, x), workspace_lora_files))
-            # 排序
             workspace_lora_files = sorted(
                 workspace_lora_files, key=lambda x: os.path.getctime(x), reverse=True)
             if len(workspace_lora_files) > 0:
@@ -634,32 +631,6 @@ def FL_KohyaSSTrain_call(args={}):
         if "network_dropout" in config["train_config"]:
             del config["train_config"]["network_dropout"]
 
-    base_controlnet = args.get("base_controlnet", "empty")
-    if base_controlnet == "empty":
-        pass
-    elif base_controlnet == "latest":
-        workspace_controlnet_dir = os.path.join(workspace_dir, "output")
-        if os.path.exists(workspace_controlnet_dir):
-            workspace_controlnet_files = Utils.listdir(
-                workspace_controlnet_dir)
-            workspace_controlnet_files = list(
-                filter(lambda x: x.endswith(".safetensors"), workspace_controlnet_files))
-            workspace_controlnet_files = list(
-                map(lambda x: os.path.join(workspace_controlnet_dir, x), workspace_controlnet_files))
-            # 排序
-            workspace_controlnet_files = sorted(
-                workspace_controlnet_files, key=lambda x: os.path.getctime(x), reverse=True)
-            if len(workspace_controlnet_files) > 0:
-                base_controlnet = os.path.join(
-                    workspace_controlnet_dir, workspace_controlnet_files[0])
-        else:
-            base_controlnet = "empty"
-    else:
-        pass
-
-    if base_controlnet != "empty" and os.path.exists(base_controlnet):
-        config["train_config"]["controlnet_model_name_or_path"] = base_controlnet
-
     train_type = config.get("metadata").get("train_type")
 
     if sample_generate == "enable":
@@ -673,9 +644,6 @@ def FL_KohyaSSTrain_call(args={}):
     with open(workspace_config_file, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4, ensure_ascii=False)
 
-    # raise Exception(
-    #     f"config: {json.dumps(config, indent=4, ensure_ascii=False)}")
-
     output_name = config["train_config"].get("output_name")
 
     if train_type == "lora_sd1_5":
@@ -684,319 +652,12 @@ def FL_KohyaSSTrain_call(args={}):
     elif train_type == "lora_sdxl":
         run_hook_kohya_ss_run_file(
             workspace_dir, output_name, kohya_ss_tool_dir, "run_lora_sdxl")
-    elif train_type == "controlnet_sd1_5":
-
-        conditioning_images_dir = os.path.join(
-            workspace_dir, "conditioning_images")
-        conditioning_images_onec = ""
-        if os.path.exists(conditioning_images_dir):
-            conditioning_images_onec = Utils.listdir(
-                conditioning_images_dir)[0]
-            config["other_config"]["controlnet_image"] = os.path.join(
-                conditioning_images_dir, conditioning_images_onec)
-            with open(workspace_config_file, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
-
-        run_hook_kohya_ss_run_file(
-            workspace_dir, output_name, kohya_ss_tool_dir, "run_controlnet_sd1_5")
-    elif train_type == "lora_hunyuan1_2" or train_type == "lora_hunyuan1_1":
-        hunyuan_models_config = args.get(
-            "hunyuan_models_config", {})
-        from .FL_train_tools_core_HYDiT import check_model_auto_download
-
-        hunyuan_models_config["version"] = config.get(
-            "metadata").get("version")
-        config["other_config"]["hunyuan_models_config"] = check_model_auto_download(
-            hunyuan_models_config)
-
-        with open(workspace_config_file, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-
-        run_hook_kohya_ss_run_file(
-            workspace_dir, output_name, kohya_ss_tool_dir, "run_lora_hunyuan1_2")
     else:
-        raise Exception(
-            f": {train_type}")
+        raise Exception(f"Unsupported train_type: {train_type}")
 
     return (
         "",
     )
-
-
-def FL_KohyaSS_KohakuBlueleaf_HYHiDSimpleT2I_call(args={}):
-    args = args.copy()
-    FL_KohyaSSCloneRepo_call(args)
-    from .FL_train_tools_core_HYDiT import check_model_auto_download
-    args = check_model_auto_download(args)
-    import numpy as np
-    import torch
-    seed = args.get("seed", 0)
-    torch.manual_seed(seed)
-    from packaging import version
-    from transformers import AutoTokenizer, BertModel
-    from diffusers.models import AutoencoderKL
-    try:
-        from k_diffusion.external import DiscreteVDDPMDenoiser
-        from k_diffusion.sampling import sample_euler_ancestral, get_sigmas_exponential, sample_dpmpp_2m_sde
-    except ImportError:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "k-diffusion"])
-        from k_diffusion.external import DiscreteVDDPMDenoiser
-        from k_diffusion.sampling import sample_euler_ancestral, get_sigmas_exponential, sample_dpmpp_2m_sde
-
-    branch_local_name = args.get("branch_local_name")
-    kohya_ss_tool_dir = os.path.join(
-        Utils.get_FL_models_path(), "train_tools", branch_local_name)
-    if kohya_ss_tool_dir not in sys.path:
-        sys.path.append(kohya_ss_tool_dir)
-    from library.hunyuan_models import DiT_g_2, MT5Embedder
-    from library.hunyuan_utils import get_cond, calc_rope
-    from networks.lora import create_network_from_weights
-
-    def load_scheduler_sigmas(beta_start=0.00085, beta_end=0.018, num_train_timesteps=1000):
-        betas = torch.linspace(beta_start**0.5, beta_end **
-                               0.5, num_train_timesteps, dtype=torch.float32) ** 2
-        alphas = 1.0 - betas
-        alphas_cumprod = torch.cumprod(alphas, dim=0)
-
-        sigmas = np.array(((1 - alphas_cumprod) / alphas_cumprod) ** 0.5)
-        sigmas = np.concatenate([sigmas[::-1], [0.0]]).astype(np.float32)
-        sigmas = torch.from_numpy(sigmas)
-        return alphas_cumprod, sigmas
-
-    version = args.get("version")
-    BETA_END = None
-    USE_EXTRA_COND = None
-    if version == "1.1":
-        BETA_END = 0.03
-        USE_EXTRA_COND = True
-    else:
-        BETA_END = 0.018
-        USE_EXTRA_COND = False
-
-    ATTN_MODE = "xformers"
-    CLIP_TOKENS = 75 * 2 + 2
-    dtype = DTYPE = torch.float16
-    device = DEVICE = "cuda"
-
-    image = None
-
-    with torch.inference_mode(True), torch.no_grad():
-        alphas, sigmas = load_scheduler_sigmas(beta_end=BETA_END)
-
-        tokenizer_path = args.get("tokenizer_path")
-        clip_tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_path, local_files_only=True)
-        clip_tokenizer.eos_token_id = 2
-
-        text_encoder_path = args.get("text_encoder_path")
-
-        clip_encoder = Utils.model_cache_get(
-            model_type="HYDiT_clip_encoder", model_path=text_encoder_path,)
-        if clip_encoder is None:
-            clip_encoder = (
-                BertModel.from_pretrained(
-                    text_encoder_path, local_files_only=True).to(device).to(dtype)
-            )
-            Utils.model_cache_set(
-                model_type="HYDiT_clip_encoder", model_path=text_encoder_path, model=clip_encoder)
-
-        t5_encoder_path = args.get("t5_encoder_path")
-        if t5_encoder_path != "none" and os.path.exists(t5_encoder_path):
-            mt5_embedder = Utils.model_cache_get(
-                model_type="HYDiT_mt5_embedder", model_path=t5_encoder_path,)
-            if mt5_embedder is None:
-                mt5_embedder = (
-                    MT5Embedder(t5_encoder_path, torch_dtype=dtype,
-                                max_length=256,).to(device).to(dtype)
-                )
-                Utils.model_cache_set(
-                    model_type="HYDiT_mt5_embedder", model_path=t5_encoder_path, model=mt5_embedder)
-        else:
-            from .FL_train_utils import CustomizeMT5Embedder
-            mt5_embedder = (
-                CustomizeMT5Embedder(
-                    batch_size=1,
-                )
-                .to(device)
-                .to(dtype)
-            )
-
-        vae_ema_path = args.get("vae_ema_path")
-        vae = Utils.model_cache_get(
-            model_type="HYDiT_vae", model_path=vae_ema_path,)
-        if vae is None:
-            vae = (
-                AutoencoderKL.from_pretrained(
-                    vae_ema_path, local_files_only=True)
-                .to(device)
-                .to(dtype)
-            )
-            Utils.model_cache_set(
-                model_type="HYDiT_vae", model_path=vae_ema_path, model=vae)
-
-        unet_path = args.get("unet_path")
-        lora_path = args.get("lora_path")
-
-        denoiser_args = Utils.model_cache_get(
-            model_type="HYDiT_unet_merge_lora", model_path=f"{unet_path}_{lora_path}")
-
-        if denoiser_args is None:
-            denoiser, patch_size, head_dim = DiT_g_2(
-                input_size=(128, 128), use_extra_cond=USE_EXTRA_COND)
-            state_dict = torch.load(unet_path)
-            denoiser.load_state_dict(state_dict)
-            denoiser.to(device).to(dtype)
-            denoiser.eval()
-            denoiser.disable_fp32_silu()
-            denoiser.disable_fp32_layer_norm()
-            denoiser.set_attn_mode(ATTN_MODE)
-
-            if lora_path is not None and lora_path != "none":
-                if not os.path.exists(lora_path):
-                    raise Exception(f"lora_path: {lora_path} 不存在")
-                lora_net, state_dict = create_network_from_weights(
-                    multiplier=1.0,
-                    file=lora_path,
-                    vae=vae,
-                    text_encoder=[clip_encoder, mt5_embedder],
-                    unet=denoiser,
-                )
-                lora_net.apply_to(
-                    text_encoder=[clip_encoder, mt5_embedder],
-                    unet=denoiser,
-                )
-                lora_net.load_state_dict(state_dict)
-                lora_net = lora_net.to(DEVICE, dtype=DTYPE)
-
-            Utils.model_cache_set(
-                model_type="HYDiT_unet_merge_lora", model_path=f"{unet_path}_{lora_path}", model=(denoiser, patch_size, head_dim))
-        else:
-            denoiser, patch_size, head_dim = denoiser_args
-
-        vae.requires_grad_(False)
-        mt5_embedder.to(torch.float16)
-        prompt = args.get("prompt")
-        negative_prompt = args.get("negative_prompt")
-        with torch.autocast("cuda"):
-            clip_h, clip_m, mt5_h, mt5_m = get_cond(
-                prompt,
-                mt5_embedder,
-                clip_tokenizer,
-                clip_encoder,
-                # Should be same as original implementation with max_length_clip=77
-                # Support 75*n + 2
-                max_length_clip=CLIP_TOKENS,
-            )
-            neg_clip_h, neg_clip_m, neg_mt5_h, neg_mt5_m = get_cond(
-                negative_prompt,
-                mt5_embedder,
-                clip_tokenizer,
-                clip_encoder,
-                max_length_clip=CLIP_TOKENS,
-            )
-            clip_h = torch.concat([clip_h, neg_clip_h], dim=0)
-            clip_m = torch.concat([clip_m, neg_clip_m], dim=0)
-            mt5_h = torch.concat([mt5_h, neg_mt5_h], dim=0)
-            mt5_m = torch.concat([mt5_m, neg_mt5_m], dim=0)
-            torch.cuda.empty_cache()
-
-        style = torch.as_tensor([0] * 2, device=DEVICE)
-        W = args.get("width")
-        H = args.get("height")
-
-        size_cond = [H, W, H, W, 0, 0]
-        image_meta_size = torch.as_tensor([size_cond] * 2, device=DEVICE)
-        freqs_cis_img = calc_rope(H, W, patch_size, head_dim)
-
-        denoiser_wrapper = DiscreteVDDPMDenoiser(
-            # A quick patch for learn_sigma
-            lambda *args, **kwargs: denoiser(* \
-                                             args, **kwargs).chunk(2, dim=1)[0],
-            alphas,
-            False,
-        ).to(DEVICE)
-
-        CFG_SCALE = cfg = args.get("cfg", 5.0)
-        STEPS = steps = args.get("steps", 25)
-
-        def cfg_denoise_func(x, sigma):
-            cond, uncond = denoiser_wrapper(
-                x.repeat(2, 1, 1, 1),
-                sigma.repeat(2),
-                encoder_hidden_states=clip_h,
-                text_embedding_mask=clip_m,
-                encoder_hidden_states_t5=mt5_h,
-                text_embedding_mask_t5=mt5_m,
-                image_meta_size=image_meta_size,
-                style=style,
-                cos_cis_img=freqs_cis_img[0],
-                sin_cis_img=freqs_cis_img[1],
-            ).chunk(2, dim=0)
-            return uncond + (cond - uncond) * CFG_SCALE
-
-        sigmas = denoiser_wrapper.get_sigmas(STEPS).to(DEVICE)
-        sigmas = get_sigmas_exponential(
-            STEPS, denoiser_wrapper.sigma_min, denoiser_wrapper.sigma_max, DEVICE
-        )
-        x1 = torch.randn(1, 4, H // 8, W // 8,
-                         dtype=torch.float16, device=DEVICE)
-
-        pbar = Utils.progress_bar(STEPS, "sdxl")
-        preview = pbar.get_previewer()
-
-        def generate_callback(args):
-            try:
-                i = args.get("i")
-                latents = args.get("denoised")
-                # decode_latent_to_preview_image
-                if hasattr(preview, "decode_latent_to_preview_image"):
-                    pil_img = preview.decode_latent_to_preview_image(
-                        None,
-                        latents,
-                    )[1]
-                else:
-                    pil_img = None
-                pbar.update(i, STEPS, pil_img)
-            except Exception as e:
-                print("generate_callback error:", e)
-                raise e
-
-        with torch.autocast("cuda"):
-            scheduler = args.get("scheduler")
-            if scheduler == "euler_ancestral":
-                sample = sample_euler_ancestral(
-                    cfg_denoise_func,
-                    x1 * sigmas[0],
-                    sigmas,
-                    callback=generate_callback,
-                )
-            else:
-                sample = sample_dpmpp_2m_sde(
-                    cfg_denoise_func,
-                    x1 * sigmas[0],
-                    sigmas,
-                    callback=generate_callback,
-                )
-            torch.cuda.empty_cache()
-            with torch.no_grad():
-                latent = sample / 0.13025
-                image = vae.decode(latent).sample
-                image = (image / 2 + 0.5).clamp(0, 1)
-                image = image.permute(0, 2, 3, 1)
-
-    keep_device = args.get("keep_device", "enable")
-    if keep_device == "disable":
-        Utils.model_cache_clean(
-            model_type="HYDiT_clip_encoder")
-        Utils.model_cache_clean(
-            model_type="HYDiT_mt5_embedder")
-        Utils.model_cache_clean(
-            model_type="HYDiT_vae")
-        Utils.model_cache_clean(
-            model_type="HYDiT_unet_merge_lora")
-
-    return (image,)
 
 
 def FL_TrainToolsDebug_call(kwargs):
