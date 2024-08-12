@@ -468,8 +468,7 @@ def run_hook_kohya_ss_run_file(workspace_dir, output_name, kohya_ss_tool_dir, tr
 
         from .FL_train_utils import HSubprocess
 
-        process_instance = HSubprocess(
-            cmd_list)
+        process_instance = HSubprocess(cmd_list)
 
         process_instance.wait()
 

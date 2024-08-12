@@ -94,4 +94,4 @@ class FL_KohyaSSTrain:
         from . import FL_train_core
         importlib.reload(FL_train_core)
         FL_train_core.FL_KohyaSSTrain_call(kwargs)
-        return ("DONE",) #return something to have Comfy wait, allows for cancellation
+        return ("DONE",) #return something more useful?

@@ -984,13 +984,7 @@ class HSubprocess:
     def __init__(self, args):
         self.args = args
 
-    def stop(self):            
-        # if self._mswindows:
-        #     print('taskkill /F /FI "WINDOWTITLE eq hook_kohya_ss_run" /T')
-        #     os.system(
-        #         f'taskkill /F /FI "WINDOWTITLE eq hook_kohya_ss_run" /T')
-            
-        #dunno if this does anything anymore?
+    def stop(self):                        
         if self.process_instance is not None:
 
             self.process_instance.kill()
@@ -1010,8 +1004,13 @@ class HSubprocess:
             self.process_instance_pid = None
 
     def wait(self):
+        interrupted = threading.Event()
+
         def read_stream(stream, log_func):
-            for line in iter(stream.readline, ''):
+            while not interrupted.is_set():
+                line = stream.readline()
+                if not line:
+                    break
                 log_func(line.strip())
             stream.close()
 
@@ -1038,15 +1037,20 @@ class HSubprocess:
             stdout_thread.start()
             stderr_thread.start()
 
-            # Wait for the process to complete
-            process.wait()
+            # Periodically check if processing is interrupted
+            while process.poll() is None:
+                if comfy.model_management.processing_interrupted():
+                    interrupted.set()
+                    process.terminate()
+                    return
+                time.sleep(0.1)  # Adjust the sleep interval as needed
 
             # Ensure all output is processed
             stdout_thread.join()
             stderr_thread.join()
 
             retcode = process.poll()
-            if retcode != 0:
+            if retcode != 0 and not comfy.model_management.processing_interrupted():
                 raise subprocess.CalledProcessError(retcode, process.args)
 
         except subprocess.CalledProcessError as e:
