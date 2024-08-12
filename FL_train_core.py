@@ -96,8 +96,8 @@ def FL_KohyaSSInitWorkspace_call(args={}):
 
 
 def FL_ImageSelecter_call(args={}):
-    images = args.get("images")
-    pil_images = Utils.tensors2pil_list(images)
+    pil_images = args.get("images")
+    #pil_images = Utils.tensors2pil_list(images)
 
     conditioning_images = args.get("conditioning_images", None)
     conditioning_pil_images = None

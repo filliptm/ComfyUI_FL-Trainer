@@ -37,6 +37,6 @@ class FL_LoadImagesFromDirectoryPath:
                 with open(caption_path, 'r', encoding='utf-8') as f:
                     captions.append(f.read().strip())
                 pil_image = Image.open(image_path)
-                images.append(Utils.pil2tensor(pil_image))
+                images.append(pil_image.convert('RGB'))
 
-        return (Utils.list_tensor2tensor(images), captions)
+        return (images, captions)
