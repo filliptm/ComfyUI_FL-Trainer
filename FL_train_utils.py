@@ -823,8 +823,8 @@ class Utils:
 
         return stop_server, port
 
-    def xy_image(pre_render_images, pre_render_texts_x, pre_render_texts_y):
-
+    def xy_image(pre_render_images, pre_render_texts_x, pre_render_texts_y, max_images_per_row=10):
+    
         def get_common_prefix(pre_render_texts_x):
             if len(pre_render_texts_x) == 0:
                 return ""
@@ -836,15 +836,15 @@ class Utils:
                         return common_prefix
                 else:
                     common_prefix += c
-
+    
             return common_prefix
-
+    
         common_prefix = get_common_prefix(pre_render_texts_x)
-
+    
         if common_prefix != "":
             pre_render_texts_x = [
                 x.replace(common_prefix, "") for x in pre_render_texts_x]
-
+    
         x_enable_num = len(pre_render_images)
         y_enable_num = len(pre_render_images[0])
         max_width = 0
@@ -856,103 +856,32 @@ class Utils:
                     org_height = pre_render_images[x][y].height
                     pre_render_images[x][y] = pre_render_images[x][y].resize(
                         (512, int(org_height * 512 / org_width)))
-
+    
                 if pre_render_images[x][y].width > max_width:
                     max_width = pre_render_images[x][y].width
                 if pre_render_images[x][y].height > max_height:
                     max_height = pre_render_images[x][y].height
-
+    
+        num_rows = (x_enable_num // max_images_per_row) + 1
         image_xy_canvas = Image.new(
-            "RGB", (max_width * x_enable_num, max_height * y_enable_num))
+            "RGB", (max_width * min(x_enable_num, max_images_per_row), max_height * num_rows))
+    
         for i in range(x_enable_num):
             for j in range(y_enable_num):
+                row = i // max_images_per_row
+                col = i % max_images_per_row
                 image_xy_canvas.paste(
-                    pre_render_images[i][j], (max_width * i, max_height * j))
-
-        # draw axis
-        from PIL import ImageDraw, ImageFont
-        import PIL
-
-        # pil_version = PIL.__version__
-        # if pil_version >= "10.0.0":
-        #     def textsize(self, text, font):
-        #         left, top, right, bottom = self.textbbox((0, 0), text, font)
-        #         return right - left, bottom - top
-        #     ImageDraw.ImageDraw.textsize = textsize
-
+                    pre_render_images[i][j], (max_width * col, max_height * row))
+    
         full_padding = 0
-
-        full_canvas_width = max_width * x_enable_num + full_padding * 2
-        full_canvas_height = max_height * y_enable_num + full_padding * 2
+    
+        full_canvas_width = max_width * min(x_enable_num, max_images_per_row) + full_padding * 2
+        full_canvas_height = max_height * num_rows + full_padding * 2
         full_canvas = Image.new(
             "RGB", (full_canvas_width, full_canvas_height), "white")
-
+    
         full_canvas.paste(image_xy_canvas, (full_padding, full_padding))
-
-        #draw = ImageDraw.Draw(full_canvas)
-
-        # top
-        # draw.line((full_padding, full_padding, full_canvas_width - full_padding,
-        #           full_padding), fill="black", width=4)
-
-        # # left
-        # draw.line((full_padding, full_padding, full_padding,
-        #           full_canvas_height - full_padding), fill="black", width=4)
-
-        # # bottom
-        # draw.line((full_padding, full_canvas_height - full_padding, full_canvas_width - full_padding,
-        #            full_canvas_height - full_padding), fill="black", width=4)
-
-        # # right
-        # draw.line((full_canvas_width - full_padding, full_padding, full_canvas_width - full_padding,
-        #            full_canvas_height - full_padding), fill="black", width=4)
-
-        # font_fullpath = Utils.download_model(
-        #     {
-        #         "url": "https://www.modelscope.cn/api/v1/models/wailovet/MinusZoneAIModels/repo?Revision=master&FilePath=font%2FAlibabaPuHuiTi-2-75-SemiBold.ttf",
-        #         "output": "font/AlibabaPuHuiTi-2-75-SemiBold.ttf",
-        #     }
-        # )
-        # if os.path.exists(font_fullpath):
-        #     font = ImageFont.truetype(font_fullpath, size=32,)
-        # else:
-        #     font = ImageFont.load_default()
-        # for i in range(x_enable_num):
-        #     textwidth, textheight = draw.textsize(
-        #         pre_render_texts_x[i], font)
-        #     offset_x = max_width * i + full_padding + \
-        #         ((max_width - textwidth) // 2)
-        #     offset_y = full_padding - textheight - 24
-
-        #     draw.text((offset_x, offset_y),
-        #               pre_render_texts_x[i], font=font, fill="black")
-
-        # for j in range(y_enable_num):
-        #     textwidth, textheight = draw.textsize(
-        #         pre_render_texts_y[j], font)
-
-        #     label_text = pre_render_texts_y[j]
-
-        #     def is_exceed_width(t):
-        #         textwidth, _ = draw.textsize(
-        #             t, font)
-        #         return textwidth > max_width - 24
-
-        #     if textwidth > full_padding - 24:
-        #         # 超过宽度就换行
-        #         label_text = ""
-        #         for c in pre_render_texts_y[j]:
-        #             if is_exceed_width(label_text + c):
-        #                 break
-        #             label_text += c
-
-        #     offset_x = full_padding - textwidth - 24
-        #     offset_y = max_height * j + full_padding + \
-        #         ((max_height - textheight) // 2)
-
-        #     draw.text((offset_x, offset_y),
-        #               label_text, font=font, fill="black")
-
+    
         return full_canvas
 
     def get_models_by_folder(dir_path):
