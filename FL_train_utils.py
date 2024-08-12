@@ -26,7 +26,7 @@ import requests
 import comfy.utils
 import platform
 import logging
-
+os.environ["PYTHONIOENCODING"] = "utf-8"
 
 CACHE_POOL = {}
 
@@ -873,14 +873,14 @@ class Utils:
         from PIL import ImageDraw, ImageFont
         import PIL
 
-        pil_version = PIL.__version__
-        if pil_version >= "10.0.0":
-            def textsize(self, text, font):
-                left, top, right, bottom = self.textbbox((0, 0), text, font)
-                return right - left, bottom - top
-            ImageDraw.ImageDraw.textsize = textsize
+        # pil_version = PIL.__version__
+        # if pil_version >= "10.0.0":
+        #     def textsize(self, text, font):
+        #         left, top, right, bottom = self.textbbox((0, 0), text, font)
+        #         return right - left, bottom - top
+        #     ImageDraw.ImageDraw.textsize = textsize
 
-        full_padding = 260
+        full_padding = 0
 
         full_canvas_width = max_width * x_enable_num + full_padding * 2
         full_canvas_height = max_height * y_enable_num + full_padding * 2
@@ -889,69 +889,69 @@ class Utils:
 
         full_canvas.paste(image_xy_canvas, (full_padding, full_padding))
 
-        draw = ImageDraw.Draw(full_canvas)
+        #draw = ImageDraw.Draw(full_canvas)
 
         # top
-        draw.line((full_padding, full_padding, full_canvas_width - full_padding,
-                  full_padding), fill="black", width=4)
+        # draw.line((full_padding, full_padding, full_canvas_width - full_padding,
+        #           full_padding), fill="black", width=4)
 
-        # left
-        draw.line((full_padding, full_padding, full_padding,
-                  full_canvas_height - full_padding), fill="black", width=4)
+        # # left
+        # draw.line((full_padding, full_padding, full_padding,
+        #           full_canvas_height - full_padding), fill="black", width=4)
 
-        # bottom
-        draw.line((full_padding, full_canvas_height - full_padding, full_canvas_width - full_padding,
-                   full_canvas_height - full_padding), fill="black", width=4)
+        # # bottom
+        # draw.line((full_padding, full_canvas_height - full_padding, full_canvas_width - full_padding,
+        #            full_canvas_height - full_padding), fill="black", width=4)
 
-        # right
-        draw.line((full_canvas_width - full_padding, full_padding, full_canvas_width - full_padding,
-                   full_canvas_height - full_padding), fill="black", width=4)
+        # # right
+        # draw.line((full_canvas_width - full_padding, full_padding, full_canvas_width - full_padding,
+        #            full_canvas_height - full_padding), fill="black", width=4)
 
-        font_fullpath = Utils.download_model(
-            {
-                "url": "https://www.modelscope.cn/api/v1/models/wailovet/MinusZoneAIModels/repo?Revision=master&FilePath=font%2FAlibabaPuHuiTi-2-75-SemiBold.ttf",
-                "output": "font/AlibabaPuHuiTi-2-75-SemiBold.ttf",
-            }
-        )
-        if os.path.exists(font_fullpath):
-            font = ImageFont.truetype(font_fullpath, size=32,)
-        else:
-            font = ImageFont.load_default()
-        for i in range(x_enable_num):
-            textwidth, textheight = draw.textsize(
-                pre_render_texts_x[i], font)
-            offset_x = max_width * i + full_padding + \
-                ((max_width - textwidth) // 2)
-            offset_y = full_padding - textheight - 24
+        # font_fullpath = Utils.download_model(
+        #     {
+        #         "url": "https://www.modelscope.cn/api/v1/models/wailovet/MinusZoneAIModels/repo?Revision=master&FilePath=font%2FAlibabaPuHuiTi-2-75-SemiBold.ttf",
+        #         "output": "font/AlibabaPuHuiTi-2-75-SemiBold.ttf",
+        #     }
+        # )
+        # if os.path.exists(font_fullpath):
+        #     font = ImageFont.truetype(font_fullpath, size=32,)
+        # else:
+        #     font = ImageFont.load_default()
+        # for i in range(x_enable_num):
+        #     textwidth, textheight = draw.textsize(
+        #         pre_render_texts_x[i], font)
+        #     offset_x = max_width * i + full_padding + \
+        #         ((max_width - textwidth) // 2)
+        #     offset_y = full_padding - textheight - 24
 
-            draw.text((offset_x, offset_y),
-                      pre_render_texts_x[i], font=font, fill="black")
+        #     draw.text((offset_x, offset_y),
+        #               pre_render_texts_x[i], font=font, fill="black")
 
-        for j in range(y_enable_num):
-            textwidth, textheight = draw.textsize(
-                pre_render_texts_y[j], font)
+        # for j in range(y_enable_num):
+        #     textwidth, textheight = draw.textsize(
+        #         pre_render_texts_y[j], font)
 
-            label_text = pre_render_texts_y[j]
+        #     label_text = pre_render_texts_y[j]
 
-            def is_exceed_width(t):
-                textwidth, _ = draw.textsize(
-                    t, font)
-                return textwidth > max_width - 24
+        #     def is_exceed_width(t):
+        #         textwidth, _ = draw.textsize(
+        #             t, font)
+        #         return textwidth > max_width - 24
 
-            if textwidth > full_padding - 24:
-                # 超过宽度就换行
-                label_text = ""
-                for c in pre_render_texts_y[j]:
-                    if is_exceed_width(label_text + c):
-                        break
-                    label_text += c
+        #     if textwidth > full_padding - 24:
+        #         # 超过宽度就换行
+        #         label_text = ""
+        #         for c in pre_render_texts_y[j]:
+        #             if is_exceed_width(label_text + c):
+        #                 break
+        #             label_text += c
 
-            offset_x = full_padding - textwidth - 24
-            offset_y = max_height * j + full_padding + \
-                ((max_height - textheight) // 2)
+        #     offset_x = full_padding - textwidth - 24
+        #     offset_y = max_height * j + full_padding + \
+        #         ((max_height - textheight) // 2)
 
-            draw.text((offset_x, offset_y),
-                      label_text, font=font, fill="black")
+        #     draw.text((offset_x, offset_y),
+        #               label_text, font=font, fill="black")
 
         return full_canvas
 
@@ -982,19 +982,13 @@ class HSubprocess:
     _mswindows = False
 
     def __init__(self, args):
-        self._mswindows = (sys.platform == "win32")
-        if self._mswindows:
-            self.args = ["start", "/w"]
-            self.args.extend(args)
-            return
-        else:
-            self.args = args
+        self.args = args
 
-    def stop(self):
-        if self._mswindows:
-            print('taskkill /F /FI "WINDOWTITLE eq hook_kohya_ss_run" /T')
-            os.system(
-                f'taskkill /F /FI "WINDOWTITLE eq hook_kohya_ss_run" /T')
+    def stop(self):            
+        # if self._mswindows:
+        #     print('taskkill /F /FI "WINDOWTITLE eq hook_kohya_ss_run" /T')
+        #     os.system(
+        #         f'taskkill /F /FI "WINDOWTITLE eq hook_kohya_ss_run" /T')
             
         #dunno if this does anything anymore?
         if self.process_instance is not None:
@@ -1016,6 +1010,11 @@ class HSubprocess:
             self.process_instance_pid = None
 
     def wait(self):
+        def read_stream(stream, log_func):
+            for line in iter(stream.readline, ''):
+                log_func(line.strip())
+            stream.close()
+
         try:
             # Run the subprocess in the same terminal
             process = subprocess.Popen(
@@ -1024,21 +1023,27 @@ class HSubprocess:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 shell=False,
-                text=True  # Automatically decode the output
+                text=True,
+                encoding="utf-8",
             )
 
             self.process_instance = process
             self.process_instance_pid = process.pid
             logging.info(f"Subprocess PID: {self.process_instance_pid}")
 
-            stdout, stderr = process.communicate()
+            # Start threads to read stdout and stderr
+            stdout_thread = threading.Thread(target=read_stream, args=(process.stdout, logging.info))
+            stderr_thread = threading.Thread(target=read_stream, args=(process.stderr, logging.error))
 
-            # Log the captured output
-            if stdout:
-                logging.info(f"Subprocess stdout: {stdout}")
+            stdout_thread.start()
+            stderr_thread.start()
 
-            if stderr:
-                logging.error(f"Subprocess stderr: {stderr}")
+            # Wait for the process to complete
+            process.wait()
+
+            # Ensure all output is processed
+            stdout_thread.join()
+            stderr_thread.join()
 
             retcode = process.poll()
             if retcode != 0:
