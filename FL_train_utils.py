@@ -25,6 +25,7 @@ from tqdm import tqdm
 import requests
 import comfy.utils
 import platform
+import logging
 
 
 CACHE_POOL = {}
@@ -978,27 +979,14 @@ class Utils:
 class HSubprocess:
     process_instance = None
     process_instance_pid = None
-    screen_name = None
     _mswindows = False
 
-    def __init__(self, args, screen_name=None):
+    def __init__(self, args):
         self._mswindows = (sys.platform == "win32")
         if self._mswindows:
             self.args = ["start", "/w"]
             self.args.extend(args)
             return
-
-        self.screen_name = screen_name
-        if screen_name is not None:
-            try:
-                subprocess.check_call(["screen", "-v"])
-            except Exception as e:
-                raise Exception("Please install screen first.")
-
-            screen_cmd = ["screen", "-R", screen_name, "-m", ]
-            screen_cmd.extend(args)
-
-            self.args = screen_cmd
         else:
             self.args = args
 
@@ -1008,11 +996,8 @@ class HSubprocess:
             os.system(
                 f'taskkill /F /FI "WINDOWTITLE eq hook_kohya_ss_run" /T')
             
-
+        #dunno if this does anything anymore?
         if self.process_instance is not None:
-            if self.screen_name is not None:
-                subprocess.run(
-                    ["screen", "-d", self.screen_name])
 
             self.process_instance.kill()
             self.process_instance = None
@@ -1031,32 +1016,43 @@ class HSubprocess:
             self.process_instance_pid = None
 
     def wait(self):
-        with subprocess.Popen(
-            self.args,
-            stdin=subprocess.PIPE,
-            shell=True,
-        ) as process:
+        try:
+            # Run the subprocess in the same terminal
+            process = subprocess.Popen(
+                self.args,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=False,
+                text=True  # Automatically decode the output
+            )
+
             self.process_instance = process
             self.process_instance_pid = process.pid
-            print(f"Subprocess PID: {self.process_instance_pid}")
-            try:
-                stdout, stderr = process.communicate()
-            except subprocess.TimeoutExpired as exc:
-                process.kill()
-                if self._mswindows:
-                    exc.stdout, exc.stderr = process.communicate()
-                else:
-                    process.wait()
-                raise
-            except Exception as e:
-                process.wait()
-                raise
+            logging.info(f"Subprocess PID: {self.process_instance_pid}")
+
+            stdout, stderr = process.communicate()
+
+            # Log the captured output
+            if stdout:
+                logging.info(f"Subprocess stdout: {stdout}")
+
+            if stderr:
+                logging.error(f"Subprocess stderr: {stderr}")
+
             retcode = process.poll()
             if retcode != 0:
                 raise subprocess.CalledProcessError(retcode, process.args)
 
-        self.process_instance = None
-        self.process_instance_pid = None
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Subprocess failed with error: {e}")
+            raise
+        except Exception as e:
+            logging.error(f"An error occurred: {e}")
+            raise
+        finally:
+            self.process_instance = None
+            self.process_instance_pid = None
 
 class AlwaysEqualProxy(str):
     def __eq__(self, _):

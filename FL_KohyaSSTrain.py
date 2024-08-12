@@ -84,8 +84,8 @@ class FL_KohyaSSTrain:
 
     sample_generate = "enable"
 
-    RETURN_TYPES = ()
-    RETURN_NAMES = ()
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("done?",)
     OUTPUT_NODE = True
     FUNCTION = "start"
     CATEGORY = "🏵️Fill Nodes/Training"
@@ -93,4 +93,5 @@ class FL_KohyaSSTrain:
     def start(self, **kwargs):
         from . import FL_train_core
         importlib.reload(FL_train_core)
-        return FL_train_core.FL_KohyaSSTrain_call(kwargs)
+        FL_train_core.FL_KohyaSSTrain_call(kwargs)
+        return ("DONE",) #return something to have Comfy wait, allows for cancellation

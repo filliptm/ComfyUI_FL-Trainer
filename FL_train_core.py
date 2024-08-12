@@ -401,7 +401,7 @@ def get_sample_images(workspace_dir, output_name):
     return result
 
 
-def run_hook_kohya_ss_run_file(workspace_dir, output_name, kohya_ss_tool_dir, trainer_func, use_screen=False):
+def run_hook_kohya_ss_run_file(workspace_dir, output_name, kohya_ss_tool_dir, trainer_func):
 
     train_config_file = os.path.join(workspace_dir, "config.json")
 
@@ -468,12 +468,9 @@ def run_hook_kohya_ss_run_file(workspace_dir, output_name, kohya_ss_tool_dir, tr
 
         from .FL_train_utils import HSubprocess
 
-        screen_name = None
-        if use_screen:
-            screen_name = "FL_train_tools_core"
-
         process_instance = HSubprocess(
-            cmd_list, screen_name=screen_name)
+            cmd_list)
+
         process_instance.wait()
 
         stop_server()
