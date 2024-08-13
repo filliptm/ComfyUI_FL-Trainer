@@ -14,19 +14,6 @@ It will also display the inference samples in the node itself so you can track t
 Stripped-down version of the trainer for people who want settings that just work.
 recommended settings in the screenshot! Load in your images and captions and let it rip.
 
-# Some things to know.
-
-Iv tested the nodes on a cloud instance and it doesn't work as fully intended. When you connect everything and hit Queue for the first time it will create a folder in the comfy/models/Loras folder named "FL_train_workspaces". In this folder, you will see a few things.
-- Folder Named after your Lora input
-- Output folder with your epochs
-- Sample_image folder where your samples are stored
-- Train images folder which is your data and captions
-- config for the train
-- and a bat and sh file.
-
-If your on a cloud instance and you setup the train in comfy and hit queue, it will run through the nodes and stop the queue like nothing happened. But the folder structure will be created. 
-
-If you navigate to the bat or the sh file in the workspace folder, you can manually run the SH and BAT file to start the train effectively in a new terminal window without comfy front end needed. You can also do this locally as well! 
 
 # Things I want to add.
 
