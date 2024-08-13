@@ -5,6 +5,8 @@ import folder_paths
 from .FL_train_utils import Utils
 import subprocess
 import sys
+from PIL import Image
+
 
 class FL_Kohya_EasyTrain:
     train_config_template_dir = os.path.join(
@@ -133,8 +135,12 @@ class FL_Kohya_EasyTrain:
                 if os.path.exists(caption_path):
                     with open(caption_path, 'r', encoding='utf-8') as f:
                         captions.append(f.read().strip())
-                    images.append(Utils.pil2tensor(Utils.loadImage(image_path)))
-        return Utils.list_tensor2tensor(images), captions
+                    try:
+                        img = Image.open(image_path).convert('RGB')
+                        images.append(img)
+                    except Exception as e:
+                        print(f"Error loading image {image_path}: {e}")
+        return images, captions
 
     def clone_or_update_repo(self):
         FL_dir = Utils.get_FL_models_path()
