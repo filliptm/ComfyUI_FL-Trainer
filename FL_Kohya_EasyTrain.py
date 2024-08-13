@@ -1,12 +1,9 @@
 import importlib
-from . import FL_train_core
 import os
 import folder_paths
 from .FL_train_utils import Utils
-import subprocess
-import sys
+from . import FL_train_core
 from PIL import Image
-
 
 class FL_Kohya_EasyTrain:
     train_config_template_dir = os.path.join(
@@ -47,19 +44,18 @@ class FL_Kohya_EasyTrain:
         if not lora_name.strip():
             raise ValueError("LoRA name is required. Please provide a name for your LoRA.")
 
-        # Clone or update the repository
-        self.clone_or_update_repo()
+        # Initialize workspace and clone repo
+        workspace_args = {
+            "lora_name": lora_name,
+            "train_config_template": train_config_template,
+        }
+        workspace_config = FL_train_core.FL_KohyaSSInitWorkspace_call(workspace_args)[0]
 
         # Initialize workspace
         workspaces_dir = os.path.join(folder_paths.output_directory, "FL_train_workspaces")
         os.makedirs(workspaces_dir, exist_ok=True)
         workspace_dir = os.path.join(workspaces_dir, lora_name)
         os.makedirs(workspace_dir, exist_ok=True)
-
-        workspace_config = {
-            "workspace_name": lora_name,
-            "workspace_dir": workspace_dir,
-        }
 
         # Load images and set up dataset configuration
         images, captions = self.load_images(image_directory)
@@ -141,37 +137,3 @@ class FL_Kohya_EasyTrain:
                     except Exception as e:
                         print(f"Error loading image {image_path}: {e}")
         return images, captions
-
-    def clone_or_update_repo(self):
-        FL_dir = Utils.get_FL_models_path()
-        kohya_ss_lora_dir = os.path.join(FL_dir, "train_tools", "kohya_ss_lora")
-        repo_url = "https://github.com/kohya-ss/sd-scripts"
-        branch = "main"  # You can change this to a specific branch if needed
-
-        if not os.path.exists(kohya_ss_lora_dir):
-            # Clone the repository if it doesn't exist
-            subprocess.run(
-                ["git", "clone", "--depth", "1", repo_url, kohya_ss_lora_dir],
-                check=True
-            )
-        else:
-            # Update the existing repository
-            subprocess.run(
-                ["git", "fetch", "--depth", "1", "origin", branch],
-                cwd=kohya_ss_lora_dir,
-                check=True
-            )
-            subprocess.run(
-                ["git", "checkout", branch],
-                cwd=kohya_ss_lora_dir,
-                check=True
-            )
-            subprocess.run(
-                ["git", "pull", "origin", branch],
-                cwd=kohya_ss_lora_dir,
-                check=True
-            )
-
-        # Ensure the repo directory is in sys.path
-        if kohya_ss_lora_dir not in sys.path:
-            sys.path.append(kohya_ss_lora_dir)
