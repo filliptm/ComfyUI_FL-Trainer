@@ -2,6 +2,7 @@ import os
 import importlib
 import folder_paths
 from .FL_train_utils import AlwaysEqualProxy, Utils
+import glob
 
 
 class FL_KohyaSSTrain:
@@ -85,7 +86,7 @@ class FL_KohyaSSTrain:
     sample_generate = "enable"
 
     RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("done?",)
+    RETURN_NAMES = ("last_lora_path",)
     OUTPUT_NODE = True
     FUNCTION = "start"
     CATEGORY = "🏵️Fill Nodes/Training"
@@ -93,5 +94,28 @@ class FL_KohyaSSTrain:
     def start(self, **kwargs):
         from . import FL_train_core
         importlib.reload(FL_train_core)
+
+        # Generate the config to get the output directory
+        config = FL_train_core.generate_kohya_ss_config(kwargs)
+        output_dir = config["train_config"]["output_dir"]
+
+        # Call the training function
         FL_train_core.FL_KohyaSSTrain_call(kwargs)
-        return ("DONE",) #return something more useful?
+
+        # After training, find the most recent .safetensors file
+        last_lora_path = self.find_latest_lora(output_dir)
+
+        return (last_lora_path,)
+
+    def find_latest_lora(self, output_dir):
+        # Find all .safetensors files in the output directory and its subdirectories
+        safetensors_files = glob.glob(os.path.join(output_dir, "**", "*.safetensors"), recursive=True)
+
+        if not safetensors_files:
+            return "No .safetensors files found"
+
+        # Get the most recently modified file
+        latest_file = max(safetensors_files, key=os.path.getmtime)
+
+        # Return the absolute path of the file
+        return os.path.abspath(latest_file)
