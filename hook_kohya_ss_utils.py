@@ -92,15 +92,20 @@ Session.request = Session_request_wrapper
 import diffusers.loaders.single_file
 original_snapshot_download = diffusers.loaders.single_file.snapshot_download
 
+
 def _snapshot_download(repo_id, *args, **kwargs):
     print(f"_snapshot_download: {repo_id}")
+    config_dir = os.path.join(os.path.dirname(__file__), "configs", "models_config")
+
     if repo_id == "runwayml/stable-diffusion-v1-5":
-        return os.path.join(
-            os.path.dirname(__file__), "configs", "models_config", "stable-diffusion-v1-5",)
+        return os.path.join(config_dir, "stable-diffusion-v1-5")
     if repo_id == "stabilityai/stable-diffusion-xl-base-1.0":
-        return os.path.join(
-            os.path.dirname(__file__), "configs", "models_config", "stable-diffusion-xl-base-1.0",)
-    raise NotImplementedError("_snapshot_download is not supported")
+        return os.path.join(config_dir, "stable-diffusion-xl-base-1.0")
+    if repo_id.startswith("Lykon/"):
+        print(f"Using configuration for SD1.5 model: {repo_id}")
+        return os.path.join(config_dir, "stable-diffusion-v1-5")
+
+    raise NotImplementedError(f"_snapshot_download is not supported for {repo_id}")
 
 diffusers.loaders.single_file.snapshot_download = _snapshot_download
 
@@ -254,36 +259,45 @@ def _load_target_model(args: argparse.Namespace, weight_dtype, device="cpu", une
     from library.original_unet import UNet2DConditionModel
 
     name_or_path = args.pretrained_model_name_or_path
-    name_or_path = os.path.realpath(name_or_path) if os.path.islink(
-        name_or_path) else name_or_path
+    name_or_path = os.path.realpath(name_or_path) if os.path.islink(name_or_path) else name_or_path
     load_stable_diffusion_format = False
-    if True:
+
+    if os.path.isfile(name_or_path):
+        print(f"Loading local model: {name_or_path}")
         try:
             pipe = StableDiffusionPipeline.from_single_file(
-                name_or_path, local_files_only=True, safety_checker=None)
-        except EnvironmentError as ex:
-            print(
-                f"model is not found as a file or in Hugging Face, perhaps file name is wrong? / 指定したモデル名のファイル、またはHugging Faceのモデルが見つかりません。ファイル名が誤っているかもしれません: {name_or_path}"
+                name_or_path, local_files_only=True, safety_checker=None,
+                config_dir=os.path.join(os.path.dirname(__file__), "configs", "models_config", "stable-diffusion-v1-5")
             )
-            raise ex
+        except Exception as ex:
+            print(f"Error loading local model: {ex}")
+            raise
+    else:
+        print(f"Model not found locally, attempting to load from Hugging Face: {name_or_path}")
+        try:
+            pipe = StableDiffusionPipeline.from_pretrained(
+                name_or_path, local_files_only=False, safety_checker=None)
+        except Exception as ex:
+            print(f"Error loading model from Hugging Face: {ex}")
+            raise
 
-        text_encoder = pipe.text_encoder
-        vae = pipe.vae
-        unet = pipe.unet
-        global clip_large_tokenizer
-        clip_large_tokenizer = pipe.tokenizer
-        del pipe
+    text_encoder = pipe.text_encoder
+    vae = pipe.vae
+    unet = pipe.unet
+    global clip_large_tokenizer
+    clip_large_tokenizer = pipe.tokenizer
+    del pipe
 
-        original_unet = UNet2DConditionModel(
-            unet.config.sample_size,
-            unet.config.attention_head_dim,
-            unet.config.cross_attention_dim,
-            unet.config.use_linear_projection,
-            unet.config.upcast_attention,
-        )
-        original_unet.load_state_dict(unet.state_dict())
-        unet = original_unet
-        print("U-Net converted to original U-Net")
+    original_unet = UNet2DConditionModel(
+        unet.config.sample_size,
+        unet.config.attention_head_dim,
+        unet.config.cross_attention_dim,
+        unet.config.use_linear_projection,
+        unet.config.upcast_attention,
+    )
+    original_unet.load_state_dict(unet.state_dict())
+    unet = original_unet
+    print("U-Net converted to original U-Net")
 
     if args.vae is not None:
         vae = model_util.load_vae(args.vae, weight_dtype)
